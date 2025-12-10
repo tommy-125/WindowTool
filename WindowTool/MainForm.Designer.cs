@@ -1,6 +1,6 @@
 ﻿namespace WindowTool
 {
-    partial class Form1
+    partial class MainForm
     {
         /// <summary>
         ///  Required designer variable.
@@ -26,12 +26,17 @@
         ///  Required method for Designer support - do not modify
         ///  the contents of this method with the code editor.
         /// </summary>
-        private void InitializeComponent()
-        {
-            components = new System.ComponentModel.Container();
+        private void InitializeComponent() {
+            SuspendLayout();
+            // 
+            // MainForm
+            // 
+            AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
-            Text = "Form1";
+            Name = "MainForm";
+            Text = "MainForm";
+            ResumeLayout(false);
         }
 
         #endregion
