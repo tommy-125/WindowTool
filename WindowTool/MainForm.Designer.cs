@@ -27,18 +27,32 @@
         ///  the contents of this method with the code editor.
         /// </summary>
         private void InitializeComponent() {
+            ProcessListBox = new ListBox();
             SuspendLayout();
+            // 
+            // ProcessListBox
+            // 
+            ProcessListBox.FormattingEnabled = true;
+            ProcessListBox.Location = new Point(12, 12);
+            ProcessListBox.Name = "ProcessListBox";
+            ProcessListBox.Size = new Size(199, 308);
+            ProcessListBox.TabIndex = 0;
+            ProcessListBox.DoubleClick += listBox1_DoubleClick;
             // 
             // MainForm
             // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleDimensions = new SizeF(9F, 19F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
+            ClientSize = new Size(598, 400);
+            Controls.Add(ProcessListBox);
+            Margin = new Padding(4, 4, 4, 4);
             Name = "MainForm";
             Text = "MainForm";
             ResumeLayout(false);
         }
 
         #endregion
+
+        private ListBox ProcessListBox;
     }
 }

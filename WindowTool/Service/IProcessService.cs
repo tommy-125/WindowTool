@@ -5,10 +5,7 @@ using WindowTool.Model;
 
 namespace WindowTool.Service {
     internal interface IProcessService {
-        ProcessInfo? GetFocusWindowProcess();
-
-        List<ProcessInfo> GetAllWindowProcesses();
-
+      
 
         
     }

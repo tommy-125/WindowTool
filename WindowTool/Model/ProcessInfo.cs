@@ -9,10 +9,13 @@ namespace WindowTool.Model {
         public string Name { get; set; }
         public int Id { get; set; }
         public string MainWindowTitle { get; set; }
+        public float? Volume { get; set; }
         public ProcessInfo(Process process) {
             Name = process.ProcessName;
             Id = process.Id;
             MainWindowTitle = process.MainWindowTitle;
+            Volume = null;
+
         }
 
         public bool Refresh() {
