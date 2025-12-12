@@ -27,32 +27,46 @@
         ///  the contents of this method with the code editor.
         /// </summary>
         private void InitializeComponent() {
-            ProcessListBox = new ListBox();
+            WindowProcessListBox = new ListBox();
+            RefreshProcessListBox = new Button();
             SuspendLayout();
             // 
-            // ProcessListBox
+            // WindowProcessListBox
             // 
-            ProcessListBox.FormattingEnabled = true;
-            ProcessListBox.Location = new Point(12, 12);
-            ProcessListBox.Name = "ProcessListBox";
-            ProcessListBox.Size = new Size(199, 308);
-            ProcessListBox.TabIndex = 0;
-            ProcessListBox.DoubleClick += listBox1_DoubleClick;
+            WindowProcessListBox.FormattingEnabled = true;
+            WindowProcessListBox.Location = new Point(9, 9);
+            WindowProcessListBox.Margin = new Padding(2);
+            WindowProcessListBox.Name = "WindowProcessListBox";
+            WindowProcessListBox.Size = new Size(208, 229);
+            WindowProcessListBox.TabIndex = 0;
+            WindowProcessListBox.DoubleClick += WindowProcessListBox_DoubleClick;
+            // 
+            // RefreshProcessListBox
+            // 
+            RefreshProcessListBox.Location = new Point(9, 271);
+            RefreshProcessListBox.Name = "RefreshProcessListBox";
+            RefreshProcessListBox.Size = new Size(75, 23);
+            RefreshProcessListBox.TabIndex = 1;
+            RefreshProcessListBox.Text = "刷新列表";
+            RefreshProcessListBox.UseVisualStyleBackColor = true;
+            RefreshProcessListBox.Click += RefreshProcessListBox_Click;
             // 
             // MainForm
             // 
-            AutoScaleDimensions = new SizeF(9F, 19F);
+            AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(598, 400);
-            Controls.Add(ProcessListBox);
-            Margin = new Padding(4, 4, 4, 4);
+            ClientSize = new Size(390, 306);
+            Controls.Add(RefreshProcessListBox);
+            Controls.Add(WindowProcessListBox);
             Name = "MainForm";
             Text = "MainForm";
+            Load += MainForm_Load;
             ResumeLayout(false);
         }
 
         #endregion
 
-        private ListBox ProcessListBox;
+        private ListBox WindowProcessListBox;
+        private Button RefreshProcessListBox;
     }
 }
