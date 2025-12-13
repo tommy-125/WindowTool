@@ -60,6 +60,7 @@
             Controls.Add(WindowProcessListBox);
             Name = "MainForm";
             Text = "MainForm";
+            FormClosing += MainForm_FormClosing;
             Load += MainForm_Load;
             ResumeLayout(false);
         }

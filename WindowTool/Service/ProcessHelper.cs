@@ -167,6 +167,8 @@ namespace WindowTool.Service {
             }
         }
 
+
+
         public static ProcessInfo? GetFocusWindowProcess() {
             IntPtr hwnd = GetForegroundWindow();
             if (hwnd != IntPtr.Zero) {
@@ -189,7 +191,8 @@ namespace WindowTool.Service {
             .ToList();
         }
 
-        public static bool SetTopMost(IntPtr hwnd, bool topMost) {
+        public static bool 
+            SetTopMost(IntPtr hwnd, bool topMost) {
             const uint SWP_NOMOVE = 0x0002;
             const uint SWP_NOSIZE = 0x0001;
             const uint SWP_SHOWWINDOW = 0x0040;

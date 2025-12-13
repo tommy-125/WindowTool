@@ -25,6 +25,8 @@
         private void InitializeComponent() {
             tableLayoutPanel1 = new TableLayoutPanel();
             UnfocusMutePanel = new Panel();
+            FocusUnmuteDurationNumericUpDown = new NumericUpDown();
+            FocusUnmuteDurationLabel = new Label();
             FadeUnmuteDurationNumericUpDown = new NumericUpDown();
             FadeUnmuteDurationLabel = new Label();
             FadeMuteDurationNumericUpDown = new NumericUpDown();
@@ -33,14 +35,12 @@
             UnfocusMuteDurationNumericUpDown = new NumericUpDown();
             EnableUnfocusMuteCheckBox = new CheckBox();
             EnableTopMostCheckBox = new CheckBox();
-            FocusUnmuteDurationLabel = new Label();
-            FocusUnmuteDurationNumericUpDown = new NumericUpDown();
             tableLayoutPanel1.SuspendLayout();
             UnfocusMutePanel.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)FocusUnmuteDurationNumericUpDown).BeginInit();
             ((System.ComponentModel.ISupportInitialize)FadeUnmuteDurationNumericUpDown).BeginInit();
             ((System.ComponentModel.ISupportInitialize)FadeMuteDurationNumericUpDown).BeginInit();
             ((System.ComponentModel.ISupportInitialize)UnfocusMuteDurationNumericUpDown).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)FocusUnmuteDurationNumericUpDown).BeginInit();
             SuspendLayout();
             // 
             // tableLayoutPanel1
@@ -73,6 +73,22 @@
             UnfocusMutePanel.Name = "UnfocusMutePanel";
             UnfocusMutePanel.Size = new Size(175, 160);
             UnfocusMutePanel.TabIndex = 3;
+            // 
+            // FocusUnmuteDurationNumericUpDown
+            // 
+            FocusUnmuteDurationNumericUpDown.Location = new Point(134, 46);
+            FocusUnmuteDurationNumericUpDown.Name = "FocusUnmuteDurationNumericUpDown";
+            FocusUnmuteDurationNumericUpDown.Size = new Size(38, 23);
+            FocusUnmuteDurationNumericUpDown.TabIndex = 10;
+            // 
+            // FocusUnmuteDurationLabel
+            // 
+            FocusUnmuteDurationLabel.AutoSize = true;
+            FocusUnmuteDurationLabel.Location = new Point(4, 46);
+            FocusUnmuteDurationLabel.Name = "FocusUnmuteDurationLabel";
+            FocusUnmuteDurationLabel.Size = new Size(111, 15);
+            FocusUnmuteDurationLabel.TabIndex = 9;
+            FocusUnmuteDurationLabel.Text = "焦點後解除靜音(秒)";
             // 
             // FadeUnmuteDurationNumericUpDown
             // 
@@ -131,6 +147,7 @@
             EnableUnfocusMuteCheckBox.TabIndex = 4;
             EnableUnfocusMuteCheckBox.Text = "啟用失焦靜音";
             EnableUnfocusMuteCheckBox.UseVisualStyleBackColor = true;
+            EnableUnfocusMuteCheckBox.CheckedChanged += EnableUnfocusMuteCheckBox_CheckedChanged;
             // 
             // EnableTopMostCheckBox
             // 
@@ -141,22 +158,6 @@
             EnableTopMostCheckBox.TabIndex = 5;
             EnableTopMostCheckBox.Text = "置頂窗口";
             EnableTopMostCheckBox.UseVisualStyleBackColor = true;
-            // 
-            // FocusUnmuteDurationLabel
-            // 
-            FocusUnmuteDurationLabel.AutoSize = true;
-            FocusUnmuteDurationLabel.Location = new Point(4, 46);
-            FocusUnmuteDurationLabel.Name = "FocusUnmuteDurationLabel";
-            FocusUnmuteDurationLabel.Size = new Size(111, 15);
-            FocusUnmuteDurationLabel.TabIndex = 9;
-            FocusUnmuteDurationLabel.Text = "焦點後解除靜音(秒)";
-            // 
-            // FocusUnmuteDurationNumericUpDown
-            // 
-            FocusUnmuteDurationNumericUpDown.Location = new Point(134, 46);
-            FocusUnmuteDurationNumericUpDown.Name = "FocusUnmuteDurationNumericUpDown";
-            FocusUnmuteDurationNumericUpDown.Size = new Size(38, 23);
-            FocusUnmuteDurationNumericUpDown.TabIndex = 10;
             // 
             // WindowSettingsForm
             // 
@@ -171,10 +172,10 @@
             tableLayoutPanel1.PerformLayout();
             UnfocusMutePanel.ResumeLayout(false);
             UnfocusMutePanel.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)FocusUnmuteDurationNumericUpDown).EndInit();
             ((System.ComponentModel.ISupportInitialize)FadeUnmuteDurationNumericUpDown).EndInit();
             ((System.ComponentModel.ISupportInitialize)FadeMuteDurationNumericUpDown).EndInit();
             ((System.ComponentModel.ISupportInitialize)UnfocusMuteDurationNumericUpDown).EndInit();
-            ((System.ComponentModel.ISupportInitialize)FocusUnmuteDurationNumericUpDown).EndInit();
             ResumeLayout(false);
         }
 

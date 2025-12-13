@@ -18,19 +18,25 @@ namespace WindowTool.Service {
             }
             return null;
         }
-        public static async Task MuteProcess(ProcessInfo process, AudioSessionControl session, bool isMute, int delayMuteSec, int fadeDurationSec, CancellationToken ctsToken) {
+        public static async void MuteProcess(ProcessInfo process, AudioSessionControl session, int delayMuteSec, int fadeDurationSec, CancellationToken ctsToken) {
             try {
+                process.IsProcessingTask = true;
                 await Task.Delay(delayMuteSec * 1000, ctsToken);
-                if (isMute) {
+
+                if (process.ShouldBeMuted) {
                     process.Volume = session.SimpleAudioVolume.Volume;
-                    await FadeVolume(session, process.Volume.Value, 0, fadeDurationSec, ctsToken);
-                } else {
-                    float targetVolume = process.Volume ?? 1.0f;
-                    await FadeVolume(session, session.SimpleAudioVolume.Volume, targetVolume, fadeDurationSec, ctsToken);
+                    await FadeVolume(session, process.Volume, 0, fadeDurationSec, ctsToken);
+                    process.IsMuted = true;
                 }
-            }
-            catch (TaskCanceledException) {
+                else {
+                    float targetVolume = process.Volume;
+                    await FadeVolume(session, session.SimpleAudioVolume.Volume, targetVolume, fadeDurationSec, ctsToken);
+                    process.IsMuted = false;
+                }
+            } catch (TaskCanceledException) {
                 return;
+            } finally {
+                process.IsProcessingTask = false;
             }
         }
 
@@ -46,6 +52,12 @@ namespace WindowTool.Service {
                 await Task.Delay(50, ctsToken);
             }
             session.SimpleAudioVolume.Volume = toVolume;
+        }
+
+        public static void ResetVolume(ProcessInfo process) {
+            var session = FindAudioSession(process.Id);
+            if (session == null) return;
+            session.SimpleAudioVolume.Volume = process.Volume;
         }
     }
 }

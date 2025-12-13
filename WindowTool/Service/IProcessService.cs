@@ -8,6 +8,10 @@ namespace WindowTool.Service {
         public List<ProcessInfo> WindowProcessList { get; set; }
         public List<ProcessInfo> MonitorWindowProcessList { get; set; }
 
+        public void StartMonitoring();
+        public void StopMonitoring();
+        public void AddToMonitorList(ProcessInfo processInfo);
+        public void RemoveFromMonitorList(ProcessInfo processInfo);
         public void MonitorProcess();
         public void RefreshWindowProcessList();
     }
