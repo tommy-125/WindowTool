@@ -22,17 +22,25 @@ namespace WindowTool.Service {
             ProcessHelper.FocusWindowChanged += OnFocusWindowChanged;
         }
 
-        // 啟動監控
+        /// <summary>
+        /// 啟動監控
+        /// </summary>
         public void StartMonitoring() {
             ProcessHelper.StartFocusWindowMonitoring();
         }
 
-        // 停止監控
+        /// <summary>
+        /// 停止監控
+        /// </summary>
         public void StopMonitoring() {
             ProcessHelper.StopFocusWindowMonitoring();
             ProcessHelper.FocusWindowChanged -= OnFocusWindowChanged;  // 取消訂閱
         }
 
+        /// <summary>
+        /// 將進程加入監控列表
+        /// </summary>
+        /// <param name="processInfo"></param>
         public void AddToMonitorList(ProcessInfo processInfo) {
             if (!MonitorWindowProcessList.Any(p => p.Id == processInfo.Id)) {
                 MonitorWindowProcessList.Add(processInfo);
@@ -40,6 +48,10 @@ namespace WindowTool.Service {
             }
         }
 
+        /// <summary>
+        /// 將進程從監控列表中移除
+        /// </summary>
+        /// <param name="processInfo"></param>
         public void RemoveFromMonitorList(ProcessInfo processInfo) {
             var existingProcess = MonitorWindowProcessList.FirstOrDefault(p => p.Id == processInfo.Id);
             if (existingProcess != null) {
@@ -50,7 +62,11 @@ namespace WindowTool.Service {
             }
         }
 
-        // 當焦點視窗改變時執行
+        /// <summary>
+        /// 當焦點視窗改變時執行
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="processInfo"></param>
         private void OnFocusWindowChanged(object? sender, ProcessInfo? processInfo) {
             if (processInfo != null) Debug.WriteLine($"[ProcessService] Focus changed to: {processInfo.MainWindowTitle} (PID: {processInfo.Id})");
             else Debug.WriteLine($"[ProcessService] Focus changed to: null");
@@ -58,6 +74,9 @@ namespace WindowTool.Service {
             MonitorProcess();
         }
         
+        /// <summary>
+        /// 監控進程核心邏輯
+        /// </summary>
         public void MonitorProcess() {
             CleanupCompletedTasks();
             RefreshMonitorWindowProcessList();
@@ -85,7 +104,10 @@ namespace WindowTool.Service {
                 }
             }
         }
-        // 清理已完成的任務
+        
+        /// <summary>
+        /// 清理已完成的任務
+        /// </summary>
         private void CleanupCompletedTasks() {
             var completedPids = new List<int>();
 
@@ -113,6 +135,10 @@ namespace WindowTool.Service {
             }
         }
 
+        /// <summary>
+        /// 開始指定進程的靜音任務
+        /// </summary>
+        /// <param name="process"></param>
         private void StartTask(ProcessInfo process) {
             var session = AudioHelper.FindAudioSession(process.Id);
             if (session == null) {
@@ -142,6 +168,10 @@ namespace WindowTool.Service {
             Debug.WriteLine($"[StartTask] Started task for PID: {process.Id}, ShouldBeMuted: {process.ShouldBeMuted}");
         }
 
+        /// <summary>
+        /// 取消指定進程的靜音任務
+        /// </summary>
+        /// <param name="process"></param>
         private void CancelTask(ProcessInfo process) {
             if (_muteTasks.TryGetValue(process.Id, out var taskInfo)) {
                 taskInfo.Cts.Cancel();
@@ -152,6 +182,9 @@ namespace WindowTool.Service {
             }
         }
 
+        /// <summary>
+        /// 刷新系統中所有視窗進程列表
+        /// </summary>
         public void RefreshWindowProcessList() {
             // 取得目前系統中所有視窗進程
             var currentProcesses = ProcessHelper.GetAllWindowProcess();
@@ -166,8 +199,11 @@ namespace WindowTool.Service {
             // 加入新的進程（只加入原本列表中不存在的 PID）
             var newProcesses = currentProcesses.Where(p => !existingPidDict.ContainsKey(p.Id));
             WindowProcessList.AddRange(newProcesses);
-        }    
+        }
 
+        /// <summary>
+        /// 將已關閉或不啟用靜音邏輯的進程從監控列表中移除
+        /// </summary>
         private void RefreshMonitorWindowProcessList() {
             // 在移除前先取消任務
             var removedProcesses = MonitorWindowProcessList?.Where(p => !p.Refresh() || !p.EnableUnfocusMute).ToList();

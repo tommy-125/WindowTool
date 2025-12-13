@@ -5,11 +5,6 @@ namespace WindowTool
 {
     public partial class MainForm : Form {
         private readonly IProcessService ProcessService;
-        /// <summary>
-        /// test
-        /// <para>12345</para>
-        /// </summary>
-        /// <param name="processService"></param>
         public MainForm(IProcessService processService) {
             InitializeComponent();
             ProcessService = processService;

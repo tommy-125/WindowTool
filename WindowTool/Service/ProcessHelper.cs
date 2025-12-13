@@ -25,7 +25,16 @@ namespace WindowTool.Service {
         uint uFlags
         );
 
-        // 【1】定義回調函式的委派型別
+        /// <summary>
+        /// 定義回調函式的委派型別
+        /// </summary>
+        /// <param name="hWinEventHook"></param>
+        /// <param name="eventType"></param>
+        /// <param name="hwnd"></param>
+        /// <param name="idObject"></param>
+        /// <param name="idChild"></param>
+        /// <param name="dwEventThread"></param>
+        /// <param name="dwmsEventTime"></param>
         // 這是 Windows 會呼叫的函式簽章
         private delegate void WinEventDelegate(
             IntPtr hWinEventHook,     // Hook 句柄
@@ -37,7 +46,17 @@ namespace WindowTool.Service {
             uint dwmsEventTime        // 時間戳記
         );
 
-        // 【2】宣告 SetWinEventHook API
+        /// <summary>
+        /// 宣告 SetWinEventHook API
+        /// </summary>
+        /// <param name="eventMin"></param>
+        /// <param name="eventMax"></param>
+        /// <param name="hmodWinEventProc"></param>
+        /// <param name="lpfnWinEventProc"></param>
+        /// <param name="idProcess"></param>
+        /// <param name="idThread"></param>
+        /// <param name="dwFlags"></param>
+        /// <returns></returns>
         // 用來向 Windows 註冊 Hook
         [LibraryImport("user32.dll")]
         private static partial IntPtr SetWinEventHook(
@@ -50,24 +69,36 @@ namespace WindowTool.Service {
             uint dwFlags                            // 旗標
         );
 
-        // 【3】宣告 UnhookWinEvent API
+        /// <summary>
+        /// 宣告 UnhookWinEvent API
+        /// </summary>
+        /// <param name="hWinEventHook"></param>
+        /// <returns></returns>
         // 用來取消 Hook
         [LibraryImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static partial bool UnhookWinEvent(IntPtr hWinEventHook);
 
-        // 【4】定義常數
+        /// <summary>
+        /// 定義常數
+        /// </summary>
         private const uint EVENT_SYSTEM_FOREGROUND = 0x0003;  // 焦點改變事件
         private const uint WINEVENT_OUTOFCONTEXT = 0x0000;    // 不注入 DLL
 
-        // 【5】儲存 Hook 相關資料
+        /// <summary>
+        /// 儲存 Hook 相關資料
+        /// </summary>
         private static IntPtr _hookHandle = IntPtr.Zero;      // Hook 句柄（用來取消 Hook）
         private static WinEventDelegate? _hookDelegate;       // 保持 delegate 存活（防止被 GC 回收）
 
-        // 【6】定義事件：讓其他類別可以訂閱焦點改變
+        /// <summary>
+        /// 定義事件：讓其他類別可以訂閱焦點改變
+        /// </summary>
         public static event EventHandler<ProcessInfo?>? FocusWindowChanged;
 
-        // 【7】啟動監聽的方法
+        /// <summary>
+        /// 啟動監聽的方法
+        /// </summary>
         public static void StartFocusWindowMonitoring() {
             // 檢查是否已經在監聽
             if (_hookHandle != IntPtr.Zero) {
@@ -100,7 +131,9 @@ namespace WindowTool.Service {
             }
         }
 
-        // 【8】停止監聽的方法
+        /// <summary>
+        /// 停止監聽的方法
+        /// </summary>
         public static void StopFocusWindowMonitoring() {
             if (_hookHandle != IntPtr.Zero) {
                 bool success = UnhookWinEvent(_hookHandle);
@@ -115,7 +148,16 @@ namespace WindowTool.Service {
             }
         }
 
-        // 【9】回調函式：Windows 會在焦點改變時呼叫此方法
+        /// <summary>
+        /// 回調函式：Windows 會在焦點改變時呼叫此方法
+        /// </summary>
+        /// <param name="hWinEventHook"></param>
+        /// <param name="eventType"></param>
+        /// <param name="hwnd"></param>
+        /// <param name="idObject"></param>
+        /// <param name="idChild"></param>
+        /// <param name="dwEventThread"></param>
+        /// <param name="dwmsEventTime"></param>
         private static void WinEventProc(
             IntPtr hWinEventHook,      // Hook 句柄
             uint eventType,            // 事件類型
@@ -144,7 +186,11 @@ namespace WindowTool.Service {
             }
         }
 
-        // 【10】根據視窗句柄取得進程資訊
+        /// <summary>
+        /// 根據視窗句柄取得進程資訊
+        /// </summary>
+        /// <param name="hwnd"></param>
+        /// <returns></returns>
         private static ProcessInfo? GetProcessInfoByWindowHandle(IntPtr hwnd) {
             // 取得視窗所屬的進程 ID
             GetWindowThreadProcessId(hwnd, out uint pid);
@@ -167,8 +213,10 @@ namespace WindowTool.Service {
             }
         }
 
-
-
+        /// <summary>
+        /// 獲取焦點視窗Process
+        /// </summary>
+        /// <returns></returns>
         public static ProcessInfo? GetFocusWindowProcess() {
             IntPtr hwnd = GetForegroundWindow();
             if (hwnd != IntPtr.Zero) {
@@ -184,6 +232,10 @@ namespace WindowTool.Service {
             else return null;
         }
 
+        /// <summary>
+        /// 獲取全部的視窗進程
+        /// </summary>
+        /// <returns></returns>
         public static List<ProcessInfo> GetAllWindowProcess() {
             return Process.GetProcesses()
             .Where(p => !string.IsNullOrEmpty(p.MainWindowTitle))
@@ -191,6 +243,12 @@ namespace WindowTool.Service {
             .ToList();
         }
 
+        /// <summary>
+        /// 置頂視窗邏輯
+        /// </summary>
+        /// <param name="hwnd"></param>
+        /// <param name="topMost"></param>
+        /// <returns></returns>
         public static bool 
             SetTopMost(IntPtr hwnd, bool topMost) {
             const uint SWP_NOMOVE = 0x0002;
