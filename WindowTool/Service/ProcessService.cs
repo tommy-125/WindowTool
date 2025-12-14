@@ -216,6 +216,8 @@ namespace WindowTool.Service {
 
             MonitorWindowProcessList?.RemoveAll(p => !p.Refresh());
             if (MonitorWindowProcessList == null || MonitorWindowProcessList.Count == 0) return;
+
+            foreach (var process in MonitorWindowProcessList) AudioHelper.GetProcessVolume(process);
         }
         public void Dispose() {
             // 防止重複清理

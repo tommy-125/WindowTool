@@ -38,7 +38,6 @@ namespace WindowTool.Service {
                 await Task.Delay(delayMuteSec * 1000, ctsToken);
 
                 if (process.ShouldBeMuted) {
-                    process.Volume = session.SimpleAudioVolume.Volume;
                     await FadeVolume(session, process.Volume, 0, fadeDurationSec, ctsToken);
                     process.IsMuted = true;
                 }
@@ -85,6 +84,17 @@ namespace WindowTool.Service {
             var session = FindAudioSession(process.Id);
             if (session == null) return;
             session.SimpleAudioVolume.Volume = process.Volume;
+        }
+
+        public static void GetProcessVolume(ProcessInfo process) {
+            if (process == null) return;
+
+            if (!process.IsMuted && !process.IsProcessingTask) {
+                var session = FindAudioSession(process.Id);
+                if (session != null) {
+                    process.Volume = session.SimpleAudioVolume.Volume;
+                }
+            }
         }
     }
 }

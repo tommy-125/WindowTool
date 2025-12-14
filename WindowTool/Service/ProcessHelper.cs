@@ -169,7 +169,6 @@ namespace WindowTool.Service {
         {
             // 確認是焦點改變事件且視窗句柄有效
             if (eventType == EVENT_SYSTEM_FOREGROUND && hwnd != IntPtr.Zero) {
-                Debug.WriteLine($"Focus changed to window: {hwnd}");
 
                 // 根據視窗句柄取得進程資訊
                 var processInfo = GetProcessInfoByWindowHandle(hwnd);
