@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using WindowTool.Model;
+using static System.Collections.Specialized.BitVector32;
 
 namespace WindowTool.Service {
     internal static class AudioHelper {
@@ -32,21 +33,22 @@ namespace WindowTool.Service {
         /// <param name="delayMuteSec"></param>
         /// <param name="fadeDurationSec"></param>
         /// <param name="ctsToken"></param>
-        public static async void MuteProcess(ProcessInfo process, AudioSessionControl session, int delayMuteSec, int fadeDurationSec, CancellationToken ctsToken) {
-            try {
-                process.IsProcessingTask = true;
+        public static async Task MuteProcess(ProcessInfo process, AudioSessionControl session, int delayMuteSec, int fadeDurationSec, CancellationToken ctsToken) {
+            bool shouldBeMuted = process.ShouldBeMuted; // 先取起來 避免外面更改導致race condition
+            try { 
                 await Task.Delay(delayMuteSec * 1000, ctsToken);
 
-                if (process.ShouldBeMuted) {
-                    await FadeVolume(session, process.Volume, 0, fadeDurationSec, ctsToken);
+                if (shouldBeMuted) { // 靜音
+                    await FadeVolume(session, session.SimpleAudioVolume.Volume, 0, fadeDurationSec, ctsToken);
                     process.IsMuted = true;
                 }
                 else {
-                    float targetVolume = process.Volume;
-                    await FadeVolume(session, session.SimpleAudioVolume.Volume, targetVolume, fadeDurationSec, ctsToken);
+                    await FadeVolume(session, session.SimpleAudioVolume.Volume, process.OriginalVolume, fadeDurationSec, ctsToken); // 恢復到最一開始的音量
                     process.IsMuted = false;
                 }
             } catch (TaskCanceledException) {
+                if (shouldBeMuted) session.SimpleAudioVolume.Volume = process.OriginalVolume;
+                else session.SimpleAudioVolume.Volume = 0; // 取消任務時恢復到原本的音量
                 return;
             } finally {
                 process.IsProcessingTask = false;
@@ -83,17 +85,19 @@ namespace WindowTool.Service {
         public static void ResetVolume(ProcessInfo process) {
             var session = FindAudioSession(process.Id);
             if (session == null) return;
-            session.SimpleAudioVolume.Volume = process.Volume;
+            session.SimpleAudioVolume.Volume = process.OriginalVolume;
         }
 
-        public static void GetProcessVolume(ProcessInfo process) {
+        /// <summary>
+        /// 設定Process音量至目前Audio Session音量
+        /// </summary>
+        /// <param name="process"></param>
+        public static void SetProcessVolume(ProcessInfo process) {
             if (process == null) return;
-
-            if (!process.IsMuted && !process.IsProcessingTask) {
-                var session = FindAudioSession(process.Id);
-                if (session != null) {
-                    process.Volume = session.SimpleAudioVolume.Volume;
-                }
+            var session = FindAudioSession(process.Id);
+            if (session != null) {
+                process.OriginalVolume = session.SimpleAudioVolume.Volume;
+                process.HasOriginalVolume = true;
             }
         }
     }

@@ -43,6 +43,7 @@ namespace WindowTool.Service {
         /// <param name="processInfo"></param>
         public void AddToMonitorList(ProcessInfo processInfo) {
             if (!MonitorWindowProcessList.Any(p => p.Id == processInfo.Id)) {
+                AudioHelper.SetProcessVolume(processInfo);
                 MonitorWindowProcessList.Add(processInfo);
                 Debug.WriteLine($"[ProcessService] Added to monitor list: {processInfo.MainWindowTitle} (PID: {processInfo.Id})");
             }
@@ -100,6 +101,7 @@ namespace WindowTool.Service {
 
                 // 如果狀態需要改變且沒有任務在執行，啟動新任務
                 if (process.ShouldBeMuted != process.IsMuted && !process.IsProcessingTask) {
+                    process.IsProcessingTask = true;
                     StartTask(process);
                 }
             }
@@ -156,13 +158,13 @@ namespace WindowTool.Service {
                 ? process.FadeMuteDurationSec
                 : process.FadeUnmuteDurationSec;
 
-            var task = Task.Run(async () => AudioHelper.MuteProcess(
+            var task = AudioHelper.MuteProcess(
                 process,
                 session,
                 delaySeconds,
                 fadeDuration,
                 cts.Token
-            ));
+            );
 
             _muteTasks[process.Id] = (task, cts);
             Debug.WriteLine($"[StartTask] Started task for PID: {process.Id}, ShouldBeMuted: {process.ShouldBeMuted}");
@@ -175,9 +177,6 @@ namespace WindowTool.Service {
         private void CancelTask(ProcessInfo process) {
             if (_muteTasks.TryGetValue(process.Id, out var taskInfo)) {
                 taskInfo.Cts.Cancel();
-                taskInfo.Cts.Dispose();
-                _muteTasks.Remove(process.Id);
-                process.IsProcessingTask = false;
                 Debug.WriteLine($"[CancelTask] Cancelled task for PID: {process.Id}");
             }
         }
@@ -214,10 +213,8 @@ namespace WindowTool.Service {
                 }
             }
 
-            MonitorWindowProcessList?.RemoveAll(p => !p.Refresh());
+            MonitorWindowProcessList?.RemoveAll(p => !p.Refresh() || !p.EnableUnfocusMute);
             if (MonitorWindowProcessList == null || MonitorWindowProcessList.Count == 0) return;
-
-            foreach (var process in MonitorWindowProcessList) AudioHelper.GetProcessVolume(process);
         }
         public void Dispose() {
             // 防止重複清理

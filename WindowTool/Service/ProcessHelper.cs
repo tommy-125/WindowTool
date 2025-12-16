@@ -174,7 +174,6 @@ namespace WindowTool.Service {
                 var processInfo = GetProcessInfoByWindowHandle(hwnd);
 
                 if (processInfo != null) {
-                    Debug.WriteLine($"Process: {processInfo.MainWindowTitle} (PID: {processInfo.Id})");
 
                     // 觸發事件，通知所有訂閱者
                     FocusWindowChanged?.Invoke(null, processInfo);

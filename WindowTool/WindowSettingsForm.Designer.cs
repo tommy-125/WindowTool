@@ -76,7 +76,7 @@
             // 
             // FocusUnmuteDurationNumericUpDown
             // 
-            FocusUnmuteDurationNumericUpDown.Location = new Point(134, 46);
+            FocusUnmuteDurationNumericUpDown.Location = new Point(134, 89);
             FocusUnmuteDurationNumericUpDown.Name = "FocusUnmuteDurationNumericUpDown";
             FocusUnmuteDurationNumericUpDown.Size = new Size(38, 23);
             FocusUnmuteDurationNumericUpDown.TabIndex = 10;
@@ -84,7 +84,7 @@
             // FocusUnmuteDurationLabel
             // 
             FocusUnmuteDurationLabel.AutoSize = true;
-            FocusUnmuteDurationLabel.Location = new Point(4, 46);
+            FocusUnmuteDurationLabel.Location = new Point(4, 89);
             FocusUnmuteDurationLabel.Name = "FocusUnmuteDurationLabel";
             FocusUnmuteDurationLabel.Size = new Size(111, 15);
             FocusUnmuteDurationLabel.TabIndex = 9;
@@ -92,7 +92,7 @@
             // 
             // FadeUnmuteDurationNumericUpDown
             // 
-            FadeUnmuteDurationNumericUpDown.Location = new Point(134, 123);
+            FadeUnmuteDurationNumericUpDown.Location = new Point(134, 129);
             FadeUnmuteDurationNumericUpDown.Name = "FadeUnmuteDurationNumericUpDown";
             FadeUnmuteDurationNumericUpDown.Size = new Size(38, 23);
             FadeUnmuteDurationNumericUpDown.TabIndex = 8;
@@ -100,7 +100,7 @@
             // FadeUnmuteDurationLabel
             // 
             FadeUnmuteDurationLabel.AutoSize = true;
-            FadeUnmuteDurationLabel.Location = new Point(3, 125);
+            FadeUnmuteDurationLabel.Location = new Point(3, 131);
             FadeUnmuteDurationLabel.Name = "FadeUnmuteDurationLabel";
             FadeUnmuteDurationLabel.Size = new Size(102, 15);
             FadeUnmuteDurationLabel.TabIndex = 7;
@@ -108,7 +108,7 @@
             // 
             // FadeMuteDurationNumericUpDown
             // 
-            FadeMuteDurationNumericUpDown.Location = new Point(134, 84);
+            FadeMuteDurationNumericUpDown.Location = new Point(134, 49);
             FadeMuteDurationNumericUpDown.Name = "FadeMuteDurationNumericUpDown";
             FadeMuteDurationNumericUpDown.Size = new Size(38, 23);
             FadeMuteDurationNumericUpDown.TabIndex = 6;
@@ -116,7 +116,7 @@
             // FadeMuteDurationLabel
             // 
             FadeMuteDurationLabel.AutoSize = true;
-            FadeMuteDurationLabel.Location = new Point(4, 86);
+            FadeMuteDurationLabel.Location = new Point(4, 49);
             FadeMuteDurationLabel.Name = "FadeMuteDurationLabel";
             FadeMuteDurationLabel.Size = new Size(78, 15);
             FadeMuteDurationLabel.TabIndex = 5;
