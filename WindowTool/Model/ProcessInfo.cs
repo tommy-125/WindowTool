@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Diagnostics;
+using System.Threading;
 using System.Security.Cryptography.Pkcs;
 
 namespace WindowTool.Model {
@@ -23,6 +24,7 @@ namespace WindowTool.Model {
         public bool ShouldBeTopMost { get; set; }
         public bool IsProcessingTask { get; set; }
 
+        public readonly Lock VolumeLock = new Lock(); // 用於同步音量相關操作的鎖
         public ProcessInfo(Process process) {
             Name = process.ProcessName;
             Id = process.Id;
@@ -30,7 +32,6 @@ namespace WindowTool.Model {
             MainWindowTitle = process.MainWindowTitle;
             OriginalVolume = 1.0f;
             HasOriginalVolume = false;
-            EnableUnfocusMute = false;
             EnableUnfocusMute = false;
             ShouldBeMuted = false;
             ShouldBeTopMost = false;

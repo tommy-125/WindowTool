@@ -39,19 +39,21 @@ namespace WindowTool.Service {
                 await Task.Delay(delayMuteSec * 1000, ctsToken);
 
                 if (shouldBeMuted) { // 靜音
-                    await FadeVolume(session, session.SimpleAudioVolume.Volume, 0, fadeDurationSec, ctsToken);
-                    process.IsMuted = true;
+                    await FadeVolume(process, session, session.SimpleAudioVolume.Volume, 0, fadeDurationSec, ctsToken);
+                    lock (process.VolumeLock) process.IsMuted = true;
                 }
                 else {
-                    await FadeVolume(session, session.SimpleAudioVolume.Volume, process.OriginalVolume, fadeDurationSec, ctsToken); // 恢復到最一開始的音量
-                    process.IsMuted = false;
+                    await FadeVolume(process, session, session.SimpleAudioVolume.Volume, process.OriginalVolume, fadeDurationSec, ctsToken); // 恢復到最一開始的音量
+                    lock (process.VolumeLock) process.IsMuted = false;
                 }
             } catch (TaskCanceledException) {
-                if (shouldBeMuted) session.SimpleAudioVolume.Volume = process.OriginalVolume;
-                else session.SimpleAudioVolume.Volume = 0; // 取消任務時恢復到原本的音量
+                lock (process.VolumeLock) {
+                    if (shouldBeMuted) session.SimpleAudioVolume.Volume = process.OriginalVolume;
+                    else session.SimpleAudioVolume.Volume = 0; // 取消任務時恢復到原本的音量
+                }
                 return;
             } finally {
-                process.IsProcessingTask = false;
+                lock (process.VolumeLock) process.IsProcessingTask = false;
             }
         }
 
@@ -64,7 +66,7 @@ namespace WindowTool.Service {
         /// <param name="fadeDurationSec"></param>
         /// <param name="ctsToken"></param>
         /// <returns></returns>
-        private static async Task FadeVolume(AudioSessionControl session, float fromVolume, float toVolume, int fadeDurationSec, CancellationToken ctsToken) {
+        private static async Task FadeVolume(ProcessInfo process, AudioSessionControl session, float fromVolume, float toVolume, int fadeDurationSec, CancellationToken ctsToken) {
             float totalStep = fadeDurationSec * 1000 / 50;
             if (totalStep < 1) totalStep = 1;
 
@@ -72,10 +74,10 @@ namespace WindowTool.Service {
                 ctsToken.ThrowIfCancellationRequested();
                 float progress = i / totalStep;
                 float newVolume = fromVolume + (toVolume - fromVolume) * progress;
-                session.SimpleAudioVolume.Volume = newVolume;
+                lock (process.VolumeLock) session.SimpleAudioVolume.Volume = newVolume;
                 await Task.Delay(50, ctsToken);
             }
-            session.SimpleAudioVolume.Volume = toVolume;
+            lock (process.VolumeLock) session.SimpleAudioVolume.Volume = toVolume;
         }
 
         /// <summary>
@@ -85,7 +87,7 @@ namespace WindowTool.Service {
         public static void ResetVolume(ProcessInfo process) {
             var session = FindAudioSession(process.Id);
             if (session == null) return;
-            session.SimpleAudioVolume.Volume = process.OriginalVolume;
+            lock (process.VolumeLock) session.SimpleAudioVolume.Volume = process.OriginalVolume;
         }
 
         /// <summary>
@@ -96,8 +98,10 @@ namespace WindowTool.Service {
             if (process == null) return;
             var session = FindAudioSession(process.Id);
             if (session != null) {
-                process.OriginalVolume = session.SimpleAudioVolume.Volume;
-                process.HasOriginalVolume = true;
+                lock (process.VolumeLock) {
+                    process.OriginalVolume = session.SimpleAudioVolume.Volume;
+                    process.HasOriginalVolume = true;
+                }
             }
         }
     }

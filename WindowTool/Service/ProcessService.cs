@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Collections.Concurrent;
 using System.Text;
 using WindowTool.Model;
 
@@ -11,7 +12,7 @@ namespace WindowTool.Service {
     internal partial class ProcessService : IProcessService, IDisposable {
         public List<ProcessInfo> WindowProcessList { get; set; }
         public List<ProcessInfo> MonitorWindowProcessList { get; set; }
-        private Dictionary<int, (Task Task,CancellationTokenSource Cts)> _muteTasks { get; set; } = new Dictionary<int, (Task,CancellationTokenSource)>();
+        private ConcurrentDictionary<int, (Task Task,CancellationTokenSource Cts)> _muteTasks { get; set; } = new ConcurrentDictionary<int, (Task,CancellationTokenSource)>();
         private bool _disposed = false;
 
         public ProcessService() {
@@ -53,10 +54,10 @@ namespace WindowTool.Service {
         /// 將進程從監控列表中移除
         /// </summary>
         /// <param name="processInfo"></param>
-        public void RemoveFromMonitorList(ProcessInfo processInfo) {
+        public async void RemoveFromMonitorList(ProcessInfo processInfo) {
             var existingProcess = MonitorWindowProcessList.FirstOrDefault(p => p.Id == processInfo.Id);
             if (existingProcess != null) {
-                CancelTask(existingProcess); // 取消任何正在進行的任務
+                await CancelTask(existingProcess); // 取消任何正在進行的任務
                 MonitorWindowProcessList.Remove(existingProcess);
                 AudioHelper.ResetVolume(existingProcess); // 重設音量
                 Debug.WriteLine($"[ProcessService] Removed from monitor list: {processInfo.MainWindowTitle} (PID: {processInfo.Id})");
@@ -78,8 +79,7 @@ namespace WindowTool.Service {
         /// <summary>
         /// 監控進程核心邏輯
         /// </summary>
-        public void MonitorProcess() {
-            CleanupCompletedTasks();
+        public async void MonitorProcess() {
             RefreshMonitorWindowProcessList();
 
             var FocusWindowProcess = ProcessHelper.GetFocusWindowProcess();
@@ -92,7 +92,7 @@ namespace WindowTool.Service {
                     bool shouldBeUnfocusedButUnmuting = !isFocused && !process.ShouldBeMuted;
 
                     if (shouldBeFocusedButMuting || shouldBeUnfocusedButUnmuting) {
-                        CancelTask(process);
+                        await CancelTask(process);
                     }
                 }
 
@@ -106,45 +106,16 @@ namespace WindowTool.Service {
                 }
             }
         }
-        
-        /// <summary>
-        /// 清理已完成的任務
-        /// </summary>
-        private void CleanupCompletedTasks() {
-            var completedPids = new List<int>();
-
-            foreach (var kvp in _muteTasks) {
-                var pid = kvp.Key;
-                var (task, cts) = kvp.Value;
-
-                if (task.IsCompleted) {
-                    completedPids.Add(pid);
-                    cts.Dispose();
-
-                    // 更新 ProcessInfo 狀態
-                    var process = MonitorWindowProcessList.FirstOrDefault(p => p.Id == pid);
-                    if (process != null) {
-                        process.IsProcessingTask = false;
-                    }
-
-                    Debug.WriteLine($"[CleanupCompletedTasks] Removed completed task for PID: {pid}, Status: {task.Status}");
-                }
-            }
-
-            // 從字典中移除
-            foreach (var pid in completedPids) {
-                _muteTasks.Remove(pid);
-            }
-        }
 
         /// <summary>
         /// 開始指定進程的靜音任務
         /// </summary>
         /// <param name="process"></param>
-        private void StartTask(ProcessInfo process) {
+        private async void StartTask(ProcessInfo process) {
             var session = AudioHelper.FindAudioSession(process.Id);
             if (session == null) {
                 Debug.WriteLine($"[StartTask] Audio session not found for PID: {process.Id}");
+                process.IsProcessingTask = false;
                 return;
             }
 
@@ -166,7 +137,20 @@ namespace WindowTool.Service {
                 cts.Token
             );
 
+            if (_muteTasks.TryGetValue(process.Id, out var existing)) {
+                await CancelTask(process);
+                Debug.WriteLine($"[StartTask] Replaced existing task for PID: {process.Id}");
+            }
             _muteTasks[process.Id] = (task, cts);
+
+            // 自動清理已完成的任務
+            _ = task.ContinueWith(completedTask => {
+                if (_muteTasks.TryRemove(process.Id, out var removed)) {
+                    removed.Cts.Dispose();
+                    Debug.WriteLine($"Auto-cleaned task for PID: {process.Id}");
+                }
+            }, TaskScheduler.Default);
+
             Debug.WriteLine($"[StartTask] Started task for PID: {process.Id}, ShouldBeMuted: {process.ShouldBeMuted}");
         }
 
@@ -174,11 +158,18 @@ namespace WindowTool.Service {
         /// 取消指定進程的靜音任務
         /// </summary>
         /// <param name="process"></param>
-        private void CancelTask(ProcessInfo process) {
-            if (_muteTasks.TryGetValue(process.Id, out var taskInfo)) {
+        private async Task CancelTask(ProcessInfo process) {    
+            if (_muteTasks.TryRemove(process.Id, out var taskInfo)) {
                 taskInfo.Cts.Cancel();
-                Debug.WriteLine($"[CancelTask] Cancelled task for PID: {process.Id}");
-            }
+                try {
+                    await taskInfo.Task;
+                }
+                catch (OperationCanceledException) {
+                }
+                finally {
+                    taskInfo.Cts.Dispose();
+                }
+            }   
         }
 
         /// <summary>
@@ -203,12 +194,12 @@ namespace WindowTool.Service {
         /// <summary>
         /// 將已關閉或不啟用靜音邏輯的進程從監控列表中移除
         /// </summary>
-        private void RefreshMonitorWindowProcessList() {
+        private async void RefreshMonitorWindowProcessList() {
             // 在移除前先取消任務
             var removedProcesses = MonitorWindowProcessList?.Where(p => !p.Refresh() || !p.EnableUnfocusMute).ToList();
             if (removedProcesses != null) {
                 foreach (var process in removedProcesses) {
-                    CancelTask(process);
+                    await CancelTask(process);
                     Debug.WriteLine($"[RefreshMonitorWindowProcessList] Removed closed process PID: {process.Id}");
                 }
             }
@@ -234,6 +225,7 @@ namespace WindowTool.Service {
                 }
             }
             _muteTasks.Clear();
+            
 
             // 3. 標記為已清理
             _disposed = true;
