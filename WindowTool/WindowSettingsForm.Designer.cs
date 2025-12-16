@@ -23,6 +23,7 @@
         /// the contents of this method with the code editor.
         /// </summary>
         private void InitializeComponent() {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(WindowSettingsForm));
             tableLayoutPanel1 = new TableLayoutPanel();
             UnfocusMutePanel = new Panel();
             FocusUnmuteDurationNumericUpDown = new NumericUpDown();
@@ -165,6 +166,7 @@
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(329, 252);
             Controls.Add(tableLayoutPanel1);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "WindowSettingsForm";
             Text = "Settings";
             Load += WindowSettingsForm_Load;

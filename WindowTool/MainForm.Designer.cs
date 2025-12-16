@@ -27,6 +27,7 @@
         ///  the contents of this method with the code editor.
         /// </summary>
         private void InitializeComponent() {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             WindowProcessListBox = new ListBox();
             RefreshProcessListBox = new Button();
             SuspendLayout();
@@ -58,6 +59,7 @@
             ClientSize = new Size(390, 306);
             Controls.Add(RefreshProcessListBox);
             Controls.Add(WindowProcessListBox);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "MainForm";
             Text = "MainForm";
             FormClosing += MainForm_FormClosing;
