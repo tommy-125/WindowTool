@@ -13,6 +13,11 @@ namespace WindowTool {
         public WindowSettingsForm(ProcessInfo process) {
             InitializeComponent();
             this._process = process;
+            // 啟用鍵盤事件預覽
+            this.KeyPreview = true;
+
+            // 訂閱 KeyDown 事件
+            this.KeyDown += WindowSettingsForm_KeyDown;
         }
 
         /// <summary>
@@ -58,6 +63,18 @@ namespace WindowTool {
         /// <param name="e"></param>
         private void EnableUnfocusMuteCheckBox_CheckedChanged(object sender, EventArgs e) {
             UpdateUnfocusMutePanelState();
+        }
+
+        /// <summary>
+        /// 按enter關閉設定表單
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void WindowSettingsForm_KeyDown(object? sender, KeyEventArgs e) {
+            if (e.KeyCode == Keys.Enter) {
+                e.Handled = true;  // 防止其他控件處理 Enter 鍵
+                this.Close();
+            }
         }
     }
 }

@@ -37,7 +37,7 @@
             WindowProcessListBox.Location = new Point(9, 9);
             WindowProcessListBox.Margin = new Padding(2);
             WindowProcessListBox.Name = "WindowProcessListBox";
-            WindowProcessListBox.Size = new Size(208, 229);
+            WindowProcessListBox.Size = new Size(370, 229);
             WindowProcessListBox.TabIndex = 0;
             WindowProcessListBox.DoubleClick += WindowProcessListBox_DoubleClick;
             // 
