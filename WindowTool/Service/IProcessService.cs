@@ -1,18 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using WindowTool.Model;
 
 namespace WindowTool.Service {
-    public interface IProcessService {
+    public interface IProcessService : IDisposable {
         public List<ProcessInfo> WindowProcessList { get; set; }
         public List<ProcessInfo> MonitorWindowProcessList { get; set; }
 
         public void StartMonitoring();
         public void StopMonitoring();
-        public void AddToMonitorList(ProcessInfo processInfo);
-        public void RemoveFromMonitorList(ProcessInfo processInfo);
-        public void MonitorProcess();
+        public Task AddToMonitorListAsync(ProcessInfo processInfo);
+        public Task RemoveFromMonitorListAsync(ProcessInfo processInfo);
+        public Task MonitorProcessAsync();
         public void RefreshWindowProcessList();
     }
 }

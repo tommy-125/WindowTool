@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Diagnostics;
-using System.Threading;
-using System.Security.Cryptography.Pkcs;
 
 namespace WindowTool.Model {
     public class ProcessInfo {
@@ -22,9 +17,13 @@ namespace WindowTool.Model {
         public bool ShouldBeMuted { get; set; }
         public bool IsTopMost { get; set; }
         public bool ShouldBeTopMost { get; set; }
+        public bool OriginalTopMost { get; set; }
+        public bool HasOriginalTopMost { get; set; }
+        public bool TopMostManagedByTool { get; set; }
         public bool IsProcessingTask { get; set; }
 
-        public readonly Lock VolumeLock = new Lock(); // 用於同步音量相關操作的鎖
+        public readonly Lock VolumeLock = new Lock();
+
         public ProcessInfo(Process process) {
             Name = process.ProcessName;
             Id = process.Id;
@@ -38,17 +37,21 @@ namespace WindowTool.Model {
             IsMuted = false;
             IsTopMost = false;
             IsProcessingTask = false;
+            OriginalTopMost = false;
+            HasOriginalTopMost = false;
+            TopMostManagedByTool = false;
             UnfocusMuteDurationSec = 0;
             FocusUnmuteDurationSec = 0;
         }
 
         public bool Refresh() {
             try {
-                var p = Process.GetProcessById(Id);
-                this.MainWindowTitle = p.MainWindowTitle;
-                this.MainWindowHandle = p.MainWindowHandle;
+                using var process = Process.GetProcessById(Id);
+                MainWindowTitle = process.MainWindowTitle;
+                MainWindowHandle = process.MainWindowHandle;
                 return true;
-            } catch (Exception) {
+            }
+            catch (Exception) {
                 return false;
             }
         }

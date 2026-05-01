@@ -1,107 +1,120 @@
-﻿using NAudio.CoreAudioApi;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Diagnostics;
+using NAudio.CoreAudioApi;
 using WindowTool.Model;
-using static System.Collections.Specialized.BitVector32;
 
 namespace WindowTool.Service {
     internal static class AudioHelper {
-        /// <summary>
-        /// 根據Process id回傳對應的AudioSessionControl
-        /// </summary>
-        /// <param name="pid"></param>
-        /// <returns></returns>
-        public static AudioSessionControl? FindAudioSession(int pid) {
-            var enumerator = new MMDeviceEnumerator();
-            MMDevice device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            var sessionManager = device.AudioSessionManager;
-            for (int i = 0; i < sessionManager.Sessions.Count; i++) {
-                var session = sessionManager.Sessions[i];
-                if (session.GetProcessID == pid) {
-                    return session;
-                }
+        private sealed class AudioSessionHandle : IDisposable {
+            public AudioSessionHandle(MMDeviceEnumerator enumerator, MMDevice device, AudioSessionControl session) {
+                Enumerator = enumerator;
+                Device = device;
+                Session = session;
             }
-            return null;
+
+            public AudioSessionControl Session { get; }
+
+            private MMDeviceEnumerator Enumerator { get; }
+            private MMDevice Device { get; }
+
+            public void Dispose() {
+                Session.Dispose();
+                Device.Dispose();
+                Enumerator.Dispose();
+            }
         }
 
-        /// <summary>
-        /// 異步靜音程序
-        /// </summary>
-        /// <param name="process"></param>
-        /// <param name="session"></param>
-        /// <param name="delayMuteSec"></param>
-        /// <param name="fadeDurationSec"></param>
-        /// <param name="ctsToken"></param>
-        public static async Task MuteProcess(ProcessInfo process, AudioSessionControl session, int delayMuteSec, int fadeDurationSec, CancellationToken ctsToken) {
-            bool shouldBeMuted = process.ShouldBeMuted; // 先取起來 避免外面更改導致race condition
-            try { 
-                await Task.Delay(delayMuteSec * 1000, ctsToken);
+        private static AudioSessionHandle? FindAudioSession(int pid) {
+            var enumerator = new MMDeviceEnumerator();
+            try {
+                var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                try {
+                    var sessionManager = device.AudioSessionManager;
+                    for (int i = 0; i < sessionManager.Sessions.Count; i++) {
+                        var session = sessionManager.Sessions[i];
+                        if (session.GetProcessID == pid) {
+                            return new AudioSessionHandle(enumerator, device, session);
+                        }
 
-                if (shouldBeMuted) { // 靜音
-                    await FadeVolume(process, session, session.SimpleAudioVolume.Volume, 0, fadeDurationSec, ctsToken);
+                        session.Dispose();
+                    }
+                }
+                catch {
+                    device.Dispose();
+                    throw;
+                }
+
+                device.Dispose();
+                enumerator.Dispose();
+                return null;
+            }
+            catch {
+                enumerator.Dispose();
+                throw;
+            }
+        }
+
+        public static async Task MuteProcess(ProcessInfo process, int delayMuteSec, int fadeDurationSec, CancellationToken ctsToken) {
+            using var sessionHandle = FindAudioSession(process.Id);
+            if (sessionHandle == null) {
+                Debug.WriteLine($"[MuteProcess] Audio session not found for PID: {process.Id}");
+                lock (process.VolumeLock) process.IsProcessingTask = false;
+                return;
+            }
+
+            var session = sessionHandle.Session;
+            bool shouldBeMuted = process.ShouldBeMuted;
+            try {
+                await Task.Delay(delayMuteSec * 1000, ctsToken).ConfigureAwait(false);
+
+                if (shouldBeMuted) {
+                    await FadeVolume(process, session, session.SimpleAudioVolume.Volume, 0, fadeDurationSec, ctsToken).ConfigureAwait(false);
                     lock (process.VolumeLock) process.IsMuted = true;
                 }
                 else {
-                    await FadeVolume(process, session, session.SimpleAudioVolume.Volume, process.OriginalVolume, fadeDurationSec, ctsToken); // 恢復到最一開始的音量
+                    await FadeVolume(process, session, session.SimpleAudioVolume.Volume, process.OriginalVolume, fadeDurationSec, ctsToken).ConfigureAwait(false);
                     lock (process.VolumeLock) process.IsMuted = false;
                 }
-            } catch (TaskCanceledException) {
-                lock (process.VolumeLock) {
-                    if (shouldBeMuted) session.SimpleAudioVolume.Volume = process.OriginalVolume;
-                    else session.SimpleAudioVolume.Volume = 0; // 取消任務時恢復到原本的音量
-                }
-                return;
-            } finally {
+            }
+            catch (TaskCanceledException) {
+                Debug.WriteLine($"[MuteProcess] Cancelled task for PID: {process.Id}");
+            }
+            finally {
                 lock (process.VolumeLock) process.IsProcessingTask = false;
             }
         }
 
-        /// <summary>
-        /// 漸進式調整音量邏輯
-        /// </summary>
-        /// <param name="session"></param>
-        /// <param name="fromVolume"></param>
-        /// <param name="toVolume"></param>
-        /// <param name="fadeDurationSec"></param>
-        /// <param name="ctsToken"></param>
-        /// <returns></returns>
         private static async Task FadeVolume(ProcessInfo process, AudioSessionControl session, float fromVolume, float toVolume, int fadeDurationSec, CancellationToken ctsToken) {
-            float totalStep = fadeDurationSec * 1000 / 50;
-            if (totalStep < 1) totalStep = 1;
+            int totalStep = Math.Max(1, fadeDurationSec * 1000 / 50);
 
             for (int i = 1; i <= totalStep; i++) {
                 ctsToken.ThrowIfCancellationRequested();
-                float progress = i / totalStep;
+                float progress = (float)i / totalStep;
                 float newVolume = fromVolume + (toVolume - fromVolume) * progress;
                 lock (process.VolumeLock) session.SimpleAudioVolume.Volume = newVolume;
-                await Task.Delay(50, ctsToken);
+                await Task.Delay(50, ctsToken).ConfigureAwait(false);
             }
+
             lock (process.VolumeLock) session.SimpleAudioVolume.Volume = toVolume;
         }
 
-        /// <summary>
-        /// 重設Process 音量至原本設定值
-        /// </summary>
-        /// <param name="process"></param>
         public static void ResetVolume(ProcessInfo process) {
-            var session = FindAudioSession(process.Id);
-            if (session == null) return;
-            lock (process.VolumeLock) session.SimpleAudioVolume.Volume = process.OriginalVolume;
+            using var sessionHandle = FindAudioSession(process.Id);
+            if (sessionHandle == null) return;
+
+            lock (process.VolumeLock) {
+                sessionHandle.Session.SimpleAudioVolume.Volume = process.OriginalVolume;
+                process.IsMuted = false;
+                process.ShouldBeMuted = false;
+            }
         }
 
-        /// <summary>
-        /// 設定Process音量至目前Audio Session音量
-        /// </summary>
-        /// <param name="process"></param>
         public static void SetProcessVolume(ProcessInfo process) {
-            if (process == null) return;
-            var session = FindAudioSession(process.Id);
-            if (session != null) {
-                lock (process.VolumeLock) {
-                    process.OriginalVolume = session.SimpleAudioVolume.Volume;
-                    process.HasOriginalVolume = true;
-                }
+            using var sessionHandle = FindAudioSession(process.Id);
+            if (sessionHandle == null) return;
+
+            lock (process.VolumeLock) {
+                process.OriginalVolume = sessionHandle.Session.SimpleAudioVolume.Volume;
+                process.HasOriginalVolume = true;
             }
         }
     }

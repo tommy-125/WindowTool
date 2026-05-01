@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
 using WindowTool.Model;
+using WindowTool.Service;
 
 namespace WindowTool {
     public partial class WindowSettingsForm : Form {
@@ -27,6 +28,7 @@ namespace WindowTool {
         /// <param name="e"></param>
         private void WindowSettingsForm_Load(object sender, EventArgs e) {
             EnableUnfocusMuteCheckBox.Checked = _process.EnableUnfocusMute;
+            _process.IsTopMost = ProcessHelper.IsTopMost(_process.MainWindowHandle);
             EnableTopMostCheckBox.Checked = _process.IsTopMost;
             UnfocusMuteDurationNumericUpDown.Value = _process.UnfocusMuteDurationSec;
             FocusUnmuteDurationNumericUpDown.Value = _process.FocusUnmuteDurationSec;

@@ -78,6 +78,7 @@
             // FocusUnmuteDurationNumericUpDown
             // 
             FocusUnmuteDurationNumericUpDown.Location = new Point(134, 89);
+            FocusUnmuteDurationNumericUpDown.Maximum = new decimal(new int[] { 600, 0, 0, 0 });
             FocusUnmuteDurationNumericUpDown.Name = "FocusUnmuteDurationNumericUpDown";
             FocusUnmuteDurationNumericUpDown.Size = new Size(38, 23);
             FocusUnmuteDurationNumericUpDown.TabIndex = 10;
@@ -94,6 +95,7 @@
             // FadeUnmuteDurationNumericUpDown
             // 
             FadeUnmuteDurationNumericUpDown.Location = new Point(134, 129);
+            FadeUnmuteDurationNumericUpDown.Maximum = new decimal(new int[] { 600, 0, 0, 0 });
             FadeUnmuteDurationNumericUpDown.Name = "FadeUnmuteDurationNumericUpDown";
             FadeUnmuteDurationNumericUpDown.Size = new Size(38, 23);
             FadeUnmuteDurationNumericUpDown.TabIndex = 8;
@@ -110,6 +112,7 @@
             // FadeMuteDurationNumericUpDown
             // 
             FadeMuteDurationNumericUpDown.Location = new Point(134, 49);
+            FadeMuteDurationNumericUpDown.Maximum = new decimal(new int[] { 600, 0, 0, 0 });
             FadeMuteDurationNumericUpDown.Name = "FadeMuteDurationNumericUpDown";
             FadeMuteDurationNumericUpDown.Size = new Size(38, 23);
             FadeMuteDurationNumericUpDown.TabIndex = 6;
@@ -135,6 +138,7 @@
             // UnfocusMuteDurationNumericUpDown
             // 
             UnfocusMuteDurationNumericUpDown.Location = new Point(134, 4);
+            UnfocusMuteDurationNumericUpDown.Maximum = new decimal(new int[] { 600, 0, 0, 0 });
             UnfocusMuteDurationNumericUpDown.Name = "UnfocusMuteDurationNumericUpDown";
             UnfocusMuteDurationNumericUpDown.Size = new Size(38, 23);
             UnfocusMuteDurationNumericUpDown.TabIndex = 3;
