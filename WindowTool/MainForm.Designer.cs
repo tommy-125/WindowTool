@@ -1,4 +1,4 @@
-﻿namespace WindowTool
+namespace WindowTool
 {
     partial class MainForm
     {
@@ -27,41 +27,51 @@
         ///  the contents of this method with the code editor.
         /// </summary>
         private void InitializeComponent() {
+            components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             WindowProcessListBox = new ListBox();
-            RefreshProcessListBox = new Button();
+            StatusLabel = new Label();
+            WindowListRefreshTimer = new System.Windows.Forms.Timer(components);
             SuspendLayout();
             // 
             // WindowProcessListBox
             // 
+            WindowProcessListBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             WindowProcessListBox.FormattingEnabled = true;
-            WindowProcessListBox.Location = new Point(9, 9);
-            WindowProcessListBox.Margin = new Padding(2);
+            WindowProcessListBox.ItemHeight = 15;
+            WindowProcessListBox.Location = new Point(12, 12);
             WindowProcessListBox.Name = "WindowProcessListBox";
-            WindowProcessListBox.Size = new Size(370, 229);
+            WindowProcessListBox.Size = new Size(476, 274);
             WindowProcessListBox.TabIndex = 0;
             WindowProcessListBox.DoubleClick += WindowProcessListBox_DoubleClick;
             // 
-            // RefreshProcessListBox
+            // StatusLabel
             // 
-            RefreshProcessListBox.Location = new Point(9, 271);
-            RefreshProcessListBox.Name = "RefreshProcessListBox";
-            RefreshProcessListBox.Size = new Size(75, 23);
-            RefreshProcessListBox.TabIndex = 1;
-            RefreshProcessListBox.Text = "刷新列表";
-            RefreshProcessListBox.UseVisualStyleBackColor = true;
-            RefreshProcessListBox.Click += RefreshProcessListBox_Click;
+            StatusLabel.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            StatusLabel.AutoEllipsis = true;
+            StatusLabel.Location = new Point(12, 298);
+            StatusLabel.Name = "StatusLabel";
+            StatusLabel.Size = new Size(476, 23);
+            StatusLabel.TabIndex = 1;
+            StatusLabel.Text = "Ready";
+            StatusLabel.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // WindowListRefreshTimer
+            // 
+            WindowListRefreshTimer.Interval = 2000;
+            WindowListRefreshTimer.Tick += WindowListRefreshTimer_Tick;
             // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(390, 306);
-            Controls.Add(RefreshProcessListBox);
+            ClientSize = new Size(500, 330);
+            Controls.Add(StatusLabel);
             Controls.Add(WindowProcessListBox);
             Icon = (Icon)resources.GetObject("$this.Icon");
+            MinimumSize = new Size(420, 260);
             Name = "MainForm";
-            Text = "MainForm";
+            Text = "WindowTool";
             FormClosing += MainForm_FormClosing;
             Load += MainForm_Load;
             ResumeLayout(false);
@@ -70,6 +80,7 @@
         #endregion
 
         private ListBox WindowProcessListBox;
-        private Button RefreshProcessListBox;
+        private Label StatusLabel;
+        private System.Windows.Forms.Timer WindowListRefreshTimer;
     }
 }

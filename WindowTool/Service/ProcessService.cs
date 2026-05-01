@@ -9,10 +9,15 @@ namespace WindowTool.Service {
 
         private readonly ConcurrentDictionary<int, (Task Task, CancellationTokenSource Cts)> _muteTasks = new();
         private readonly SemaphoreSlim _monitorLock = new(1, 1);
+        private readonly ProcessSettingsStore _settingsStore = new();
         private bool _disposed;
 
         public ProcessService() {
             WindowProcessList = ProcessHelper.GetAllWindowProcess();
+            foreach (var process in WindowProcessList) {
+                _settingsStore.Apply(process);
+            }
+
             MonitorWindowProcessList = new List<ProcessInfo>();
 
             ProcessHelper.FocusWindowChanged += OnFocusWindowChanged;
@@ -86,18 +91,13 @@ namespace WindowTool.Service {
                 foreach (var process in MonitorWindowProcessList.ToList()) {
                     bool isFocused = process.Id == focusWindowProcess?.Id;
 
-                    if (process.IsProcessingTask) {
-                        bool shouldBeFocusedButMuting = isFocused && process.ShouldBeMuted;
-                        bool shouldBeUnfocusedButUnmuting = !isFocused && !process.ShouldBeMuted;
-
-                        if (shouldBeFocusedButMuting || shouldBeUnfocusedButUnmuting) {
-                            await CancelTaskAsync(process);
-                        }
+                    if (MonitorStateMachine.ShouldCancelRunningTask(process, isFocused)) {
+                        await CancelTaskAsync(process, syncStateToCancelledTarget: true);
                     }
 
                     process.ShouldBeMuted = !isFocused;
 
-                    if (process.ShouldBeMuted != process.IsMuted && !process.IsProcessingTask) {
+                    if (MonitorStateMachine.ShouldStartTask(process)) {
                         await StartTaskAsync(process);
                     }
                 }
@@ -140,7 +140,7 @@ namespace WindowTool.Service {
             Debug.WriteLine($"[StartTask] Started task for PID: {process.Id}, ShouldBeMuted: {process.ShouldBeMuted}");
         }
 
-        private async Task CancelTaskAsync(ProcessInfo process) {
+        private async Task CancelTaskAsync(ProcessInfo process, bool syncStateToCancelledTarget = false) {
             if (!_muteTasks.TryRemove(process.Id, out var taskInfo)) return;
 
             taskInfo.Cts.Cancel();
@@ -155,25 +155,52 @@ namespace WindowTool.Service {
             finally {
                 taskInfo.Cts.Dispose();
             }
+
+            if (syncStateToCancelledTarget) {
+                lock (process.VolumeLock) {
+                    process.IsMuted = process.ShouldBeMuted;
+                }
+            }
         }
 
-        public void RefreshWindowProcessList() {
+        public bool RefreshWindowProcessList() {
             var currentProcesses = ProcessHelper.GetAllWindowProcess();
             var currentPidSet = currentProcesses.ToDictionary(p => p.Id);
-            var existingPidDict = WindowProcessList.ToDictionary(p => p.Id);
+            bool hasChanges = false;
 
-            WindowProcessList.RemoveAll(p => !currentPidSet.ContainsKey(p.Id));
+            int removedCount = WindowProcessList.RemoveAll(p =>
+                !currentPidSet.ContainsKey(p.Id)
+                || (currentPidSet.TryGetValue(p.Id, out var currentProcess) && p.Name != currentProcess.Name));
+            hasChanges = removedCount > 0;
+
+            var existingPidDict = WindowProcessList.ToDictionary(p => p.Id);
 
             foreach (var process in WindowProcessList) {
                 if (currentPidSet.TryGetValue(process.Id, out var currentProcess)) {
-                    process.Name = currentProcess.Name;
-                    process.MainWindowTitle = currentProcess.MainWindowTitle;
-                    process.MainWindowHandle = currentProcess.MainWindowHandle;
+                    bool changed = process.Name != currentProcess.Name
+                        || process.MainWindowTitle != currentProcess.MainWindowTitle
+                        || process.MainWindowHandle != currentProcess.MainWindowHandle;
+
+                    if (changed) {
+                        process.Name = currentProcess.Name;
+                        process.MainWindowTitle = currentProcess.MainWindowTitle;
+                        process.MainWindowHandle = currentProcess.MainWindowHandle;
+                        hasChanges = true;
+                    }
                 }
             }
 
-            var newProcesses = currentProcesses.Where(p => !existingPidDict.ContainsKey(p.Id));
-            WindowProcessList.AddRange(newProcesses);
+            var newProcesses = currentProcesses.Where(p => !existingPidDict.ContainsKey(p.Id)).ToList();
+            foreach (var process in newProcesses) {
+                _settingsStore.Apply(process);
+                WindowProcessList.Add(process);
+            }
+
+            return hasChanges || newProcesses.Count > 0;
+        }
+
+        public void SaveSettings(ProcessInfo processInfo) {
+            _settingsStore.Save(processInfo);
         }
 
         private async Task RefreshMonitorWindowProcessListAsync() {

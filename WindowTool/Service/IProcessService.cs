@@ -10,6 +10,7 @@ namespace WindowTool.Service {
         public Task AddToMonitorListAsync(ProcessInfo processInfo);
         public Task RemoveFromMonitorListAsync(ProcessInfo processInfo);
         public Task MonitorProcessAsync();
-        public void RefreshWindowProcessList();
+        public bool RefreshWindowProcessList();
+        public void SaveSettings(ProcessInfo processInfo);
     }
 }
