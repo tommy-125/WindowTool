@@ -108,13 +108,26 @@ namespace WindowTool.Service {
             }
         }
 
-        public static void SetProcessVolume(ProcessInfo process) {
+        public static bool PrepareProcessVolumeForMonitoring(ProcessInfo process) {
             using var sessionHandle = FindAudioSession(process.Id);
-            if (sessionHandle == null) return;
+            if (sessionHandle == null) return false;
 
             lock (process.VolumeLock) {
+                if (process.HasOriginalVolume) {
+                    if (!process.HasRestoredOriginalVolumeForSession) {
+                        sessionHandle.Session.SimpleAudioVolume.Volume = process.OriginalVolume;
+                        process.IsMuted = false;
+                        process.ShouldBeMuted = false;
+                        process.HasRestoredOriginalVolumeForSession = true;
+                    }
+
+                    return true;
+                }
+
                 process.OriginalVolume = sessionHandle.Session.SimpleAudioVolume.Volume;
                 process.HasOriginalVolume = true;
+                process.HasRestoredOriginalVolumeForSession = true;
+                return true;
             }
         }
     }

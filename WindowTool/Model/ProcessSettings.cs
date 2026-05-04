@@ -6,5 +6,7 @@ namespace WindowTool.Model {
         public int FadeMuteDurationSec { get; set; }
         public int FadeUnmuteDurationSec { get; set; }
         public bool ShouldBeTopMost { get; set; }
+        public bool HasOriginalVolume { get; set; }
+        public float OriginalVolume { get; set; } = 1.0f;
     }
 }

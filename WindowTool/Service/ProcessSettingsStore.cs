@@ -23,6 +23,10 @@ namespace WindowTool.Service {
             process.FadeMuteDurationSec = settings.FadeMuteDurationSec;
             process.FadeUnmuteDurationSec = settings.FadeUnmuteDurationSec;
             process.ShouldBeTopMost = settings.ShouldBeTopMost;
+            process.HasOriginalVolume = settings.HasOriginalVolume;
+            if (settings.HasOriginalVolume) {
+                process.OriginalVolume = settings.OriginalVolume;
+            }
         }
 
         public void Save(ProcessInfo process) {
@@ -33,6 +37,8 @@ namespace WindowTool.Service {
                 FadeMuteDurationSec = process.FadeMuteDurationSec,
                 FadeUnmuteDurationSec = process.FadeUnmuteDurationSec,
                 ShouldBeTopMost = process.ShouldBeTopMost,
+                HasOriginalVolume = process.HasOriginalVolume,
+                OriginalVolume = process.OriginalVolume,
             };
 
             PersistSettings();

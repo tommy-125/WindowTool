@@ -39,7 +39,8 @@ namespace WindowTool.Service {
             try {
                 if (MonitorWindowProcessList.Any(p => p.Id == processInfo.Id)) return;
 
-                AudioHelper.SetProcessVolume(processInfo);
+                AudioHelper.PrepareProcessVolumeForMonitoring(processInfo);
+                _settingsStore.Save(processInfo);
                 MonitorWindowProcessList.Add(processInfo);
                 Debug.WriteLine($"[ProcessService] Added to monitor list: {processInfo.MainWindowTitle} (PID: {processInfo.Id})");
             }
@@ -90,6 +91,10 @@ namespace WindowTool.Service {
                 var focusWindowProcess = ProcessHelper.GetFocusWindowProcess();
                 foreach (var process in MonitorWindowProcessList.ToList()) {
                     bool isFocused = process.Id == focusWindowProcess?.Id;
+                    bool preparedVolume = AudioHelper.PrepareProcessVolumeForMonitoring(process);
+                    if (preparedVolume) {
+                        _settingsStore.Save(process);
+                    }
 
                     if (MonitorStateMachine.ShouldCancelRunningTask(process, isFocused)) {
                         await CancelTaskAsync(process, syncStateToCancelledTarget: true);
