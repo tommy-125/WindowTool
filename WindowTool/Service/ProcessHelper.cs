@@ -166,7 +166,23 @@ namespace WindowTool.Service {
                 }
             }
 
-            return processInfos;
+            var nativeWindowTitles = processInfos
+                .Where(process => !IsApplicationFrameHost(process))
+                .Select(process => process.MainWindowTitle)
+                .Where(title => !string.IsNullOrWhiteSpace(title))
+                .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+
+            return processInfos
+                .Where(process => !IsApplicationFrameHost(process)
+                    || !nativeWindowTitles.Contains(process.MainWindowTitle))
+                .ToList();
+        }
+
+        private static bool IsApplicationFrameHost(ProcessInfo process) {
+            return string.Equals(
+                process.Name,
+                "ApplicationFrameHost",
+                StringComparison.OrdinalIgnoreCase);
         }
 
         private static int SafeProcessId(Process process) {
@@ -179,19 +195,35 @@ namespace WindowTool.Service {
         }
 
         public static bool SetTopMost(IntPtr hwnd, bool topMost) {
+            if (hwnd == IntPtr.Zero) return false;
+
             const uint SWP_NOMOVE = 0x0002;
             const uint SWP_NOSIZE = 0x0001;
             const uint SWP_SHOWWINDOW = 0x0040;
+            const uint SWP_NOACTIVATE = 0x0010;
 
             IntPtr hwndInsertAfter = topMost ? new IntPtr(-1) : new IntPtr(-2);
 
-            bool result = SetWindowPos(hwnd, hwndInsertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+            bool result = SetWindowPos(
+                hwnd,
+                hwndInsertAfter,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE);
             if (!result) {
                 int error = Marshal.GetLastWin32Error();
                 Debug.WriteLine($"SetWindowPos failed with error code: {error}");
+                return false;
             }
 
-            return result;
+            bool applied = IsTopMost(hwnd) == topMost;
+            if (!applied) {
+                Debug.WriteLine($"SetTopMost did not apply the requested state ({topMost}) for HWND {hwnd}.");
+            }
+
+            return applied;
         }
 
         public static bool IsTopMost(IntPtr hwnd) {

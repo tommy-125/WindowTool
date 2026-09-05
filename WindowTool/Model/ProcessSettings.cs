@@ -6,7 +6,16 @@ namespace WindowTool.Model {
         public int FadeMuteDurationSec { get; set; }
         public int FadeUnmuteDurationSec { get; set; }
         public bool ShouldBeTopMost { get; set; }
-        public bool HasOriginalVolume { get; set; }
-        public float OriginalVolume { get; set; } = 1.0f;
+        public bool HasTargetVolume { get; set; }
+        public float TargetVolume { get; set; } = 1.0f;
+
+        // Kept nullable so settings written by older versions can be migrated once.
+        [System.Text.Json.Serialization.JsonIgnore(
+            Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public bool? HasOriginalVolume { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore(
+            Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public float? OriginalVolume { get; set; }
     }
 }

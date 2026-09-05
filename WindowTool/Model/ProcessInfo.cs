@@ -6,9 +6,9 @@ namespace WindowTool.Model {
         public int Id { get; set; }
         public string MainWindowTitle { get; set; }
         public IntPtr MainWindowHandle { get; set; }
-        public float OriginalVolume { get; set; }
-        public bool HasOriginalVolume { get; set; }
-        public bool HasRestoredOriginalVolumeForSession { get; set; }
+        public float TargetVolume { get; set; }
+        public bool HasTargetVolume { get; set; }
+        public bool HasAppliedTargetVolumeForSession { get; set; }
         public bool EnableUnfocusMute { get; set; }
         public int UnfocusMuteDurationSec { get; set; }
         public int FocusUnmuteDurationSec { get; set; }
@@ -30,9 +30,9 @@ namespace WindowTool.Model {
             Id = process.Id;
             MainWindowHandle = process.MainWindowHandle;
             MainWindowTitle = process.MainWindowTitle;
-            OriginalVolume = 1.0f;
-            HasOriginalVolume = false;
-            HasRestoredOriginalVolumeForSession = false;
+            TargetVolume = 1.0f;
+            HasTargetVolume = false;
+            HasAppliedTargetVolumeForSession = false;
             EnableUnfocusMute = false;
             ShouldBeMuted = false;
             ShouldBeTopMost = false;

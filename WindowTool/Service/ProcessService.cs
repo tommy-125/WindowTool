@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using WindowTool.Model;
 
@@ -7,17 +6,18 @@ namespace WindowTool.Service {
         public List<ProcessInfo> WindowProcessList { get; set; }
         public List<ProcessInfo> MonitorWindowProcessList { get; set; }
 
-        private readonly ConcurrentDictionary<int, (Task Task, CancellationTokenSource Cts)> _muteTasks = new();
+        private readonly ProcessTaskRegistry _muteTasks = new();
         private readonly SemaphoreSlim _monitorLock = new(1, 1);
         private readonly ProcessSettingsStore _settingsStore = new();
+        private readonly object _shutdownLock = new();
+        private Task? _shutdownTask;
+        private volatile bool _shuttingDown;
+        private int _focusRefreshPending;
+        private int _focusRefreshRunning;
         private bool _disposed;
 
         public ProcessService() {
-            WindowProcessList = ProcessHelper.GetAllWindowProcess();
-            foreach (var process in WindowProcessList) {
-                _settingsStore.Apply(process);
-            }
-
+            WindowProcessList = new List<ProcessInfo>();
             MonitorWindowProcessList = new List<ProcessInfo>();
 
             ProcessHelper.FocusWindowChanged += OnFocusWindowChanged;
@@ -29,7 +29,6 @@ namespace WindowTool.Service {
 
         public void StopMonitoring() {
             ProcessHelper.StopFocusWindowMonitoring();
-            ProcessHelper.FocusWindowChanged -= OnFocusWindowChanged;
         }
 
         public async Task AddToMonitorListAsync(ProcessInfo processInfo) {
@@ -37,11 +36,12 @@ namespace WindowTool.Service {
 
             await _monitorLock.WaitAsync();
             try {
+                ThrowIfShuttingDown();
                 if (MonitorWindowProcessList.Any(p => p.Id == processInfo.Id)) return;
 
                 AudioHelper.PrepareProcessVolumeForMonitoring(processInfo);
                 _settingsStore.Save(processInfo);
-                MonitorWindowProcessList.Add(processInfo);
+                MonitorWindowProcessList = [.. MonitorWindowProcessList, processInfo];
                 Debug.WriteLine($"[ProcessService] Added to monitor list: {processInfo.MainWindowTitle} (PID: {processInfo.Id})");
             }
             finally {
@@ -54,11 +54,14 @@ namespace WindowTool.Service {
 
             await _monitorLock.WaitAsync();
             try {
+                ThrowIfShuttingDown();
                 var existingProcess = MonitorWindowProcessList.FirstOrDefault(p => p.Id == processInfo.Id);
                 if (existingProcess == null) return;
 
                 await CancelTaskAsync(existingProcess);
-                MonitorWindowProcessList.Remove(existingProcess);
+                MonitorWindowProcessList = MonitorWindowProcessList
+                    .Where(process => process.Id != existingProcess.Id)
+                    .ToList();
                 AudioHelper.ResetVolume(existingProcess);
                 Debug.WriteLine($"[ProcessService] Removed from monitor list: {processInfo.MainWindowTitle} (PID: {processInfo.Id})");
             }
@@ -67,17 +70,39 @@ namespace WindowTool.Service {
             }
         }
 
-        private async void OnFocusWindowChanged(object? sender, ProcessInfo? processInfo) {
+        private void OnFocusWindowChanged(object? sender, ProcessInfo? processInfo) {
+            if (_shuttingDown) return;
+
             if (processInfo != null) Debug.WriteLine($"[ProcessService] Focus changed to: {processInfo.MainWindowTitle} (PID: {processInfo.Id})");
             else Debug.WriteLine("[ProcessService] Focus changed to: null");
 
+            Interlocked.Exchange(ref _focusRefreshPending, 1);
+            StartPendingFocusRefresh();
+        }
+
+        private void StartPendingFocusRefresh() {
+            if (Interlocked.CompareExchange(ref _focusRefreshRunning, 1, 0) != 0) return;
+            _ = ProcessPendingFocusRefreshesAsync();
+        }
+
+        private async Task ProcessPendingFocusRefreshesAsync() {
             try {
-                await MonitorProcessAsync();
+                while (!_shuttingDown && Interlocked.Exchange(ref _focusRefreshPending, 0) != 0) {
+                    try {
+                        await MonitorProcessAsync().ConfigureAwait(false);
+                    }
+                    catch (ObjectDisposedException) when (_shuttingDown || _disposed) {
+                    }
+                    catch (Exception ex) {
+                        Debug.WriteLine($"[ProcessService] Monitor failed: {ex.Message}");
+                    }
+                }
             }
-            catch (ObjectDisposedException) {
-            }
-            catch (Exception ex) {
-                Debug.WriteLine($"[ProcessService] Monitor failed: {ex.Message}");
+            finally {
+                Interlocked.Exchange(ref _focusRefreshRunning, 0);
+                if (!_shuttingDown && Volatile.Read(ref _focusRefreshPending) != 0) {
+                    StartPendingFocusRefresh();
+                }
             }
         }
 
@@ -86,13 +111,14 @@ namespace WindowTool.Service {
 
             await _monitorLock.WaitAsync();
             try {
+                ThrowIfShuttingDown();
                 await RefreshMonitorWindowProcessListAsync();
 
                 var focusWindowProcess = ProcessHelper.GetFocusWindowProcess();
                 foreach (var process in MonitorWindowProcessList.ToList()) {
                     bool isFocused = process.Id == focusWindowProcess?.Id;
-                    bool preparedVolume = AudioHelper.PrepareProcessVolumeForMonitoring(process);
-                    if (preparedVolume) {
+                    bool initializedTargetVolume = AudioHelper.PrepareProcessVolumeForMonitoring(process);
+                    if (initializedTargetVolume) {
                         _settingsStore.Save(process);
                     }
 
@@ -113,7 +139,7 @@ namespace WindowTool.Service {
         }
 
         private async Task StartTaskAsync(ProcessInfo process) {
-            if (_muteTasks.ContainsKey(process.Id)) {
+            if (_muteTasks.Contains(process.Id)) {
                 await CancelTaskAsync(process);
                 Debug.WriteLine($"[StartTask] Replaced existing task for PID: {process.Id}");
             }
@@ -128,16 +154,18 @@ namespace WindowTool.Service {
                 : process.FadeUnmuteDurationSec;
 
             process.IsProcessingTask = true;
-            var task = AudioHelper.MuteProcess(process, delaySeconds, fadeDuration, cts.Token);
-            _muteTasks[process.Id] = (task, cts);
+            var task = AudioHelper.SetMuteStateAsync(process, delaySeconds, fadeDuration, cts.Token);
+            var entry = _muteTasks.Register(process.Id, task, cts);
 
             _ = task.ContinueWith(completedTask => {
                 if (completedTask.Exception != null) {
                     Debug.WriteLine($"[StartTask] Task failed for PID {process.Id}: {completedTask.Exception.GetBaseException().Message}");
                 }
 
-                if (_muteTasks.TryRemove(process.Id, out var removed)) {
-                    removed.Cts.Dispose();
+                // Only remove this exact task. A replacement may already be registered
+                // after a rapid focus change, and must remain tracked.
+                if (_muteTasks.TryTake(process.Id, entry)) {
+                    entry.Cancellation.Dispose();
                     Debug.WriteLine($"Auto-cleaned task for PID: {process.Id}");
                 }
             }, TaskScheduler.Default);
@@ -146,9 +174,9 @@ namespace WindowTool.Service {
         }
 
         private async Task CancelTaskAsync(ProcessInfo process, bool syncStateToCancelledTarget = false) {
-            if (!_muteTasks.TryRemove(process.Id, out var taskInfo)) return;
+            if (!_muteTasks.TryTake(process.Id, out var taskInfo) || taskInfo == null) return;
 
-            taskInfo.Cts.Cancel();
+            taskInfo.Cancellation.Cancel();
             try {
                 await taskInfo.Task.ConfigureAwait(false);
             }
@@ -158,7 +186,7 @@ namespace WindowTool.Service {
                 Debug.WriteLine($"[CancelTask] Task failed while cancelling PID {process.Id}: {ex.Message}");
             }
             finally {
-                taskInfo.Cts.Dispose();
+                taskInfo.Cancellation.Dispose();
             }
 
             if (syncStateToCancelledTarget) {
@@ -169,7 +197,18 @@ namespace WindowTool.Service {
         }
 
         public bool RefreshWindowProcessList() {
-            var currentProcesses = ProcessHelper.GetAllWindowProcess();
+            return MergeWindowProcessList(ProcessHelper.GetAllWindowProcess());
+        }
+
+        public async Task<bool> RefreshWindowProcessListAsync(CancellationToken cancellationToken = default) {
+            var currentProcesses = await Task.Run(
+                ProcessHelper.GetAllWindowProcess,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return MergeWindowProcessList(currentProcesses);
+        }
+
+        private bool MergeWindowProcessList(List<ProcessInfo> currentProcesses) {
             var currentPidSet = currentProcesses.ToDictionary(p => p.Id);
             bool hasChanges = false;
 
@@ -208,6 +247,22 @@ namespace WindowTool.Service {
             _settingsStore.Save(processInfo);
         }
 
+        public async Task<bool> SetProcessVolumeAsync(ProcessInfo processInfo, float volume) {
+            ThrowIfDisposed();
+
+            await _monitorLock.WaitAsync();
+            try {
+                ThrowIfShuttingDown();
+                await CancelTaskAsync(processInfo);
+                bool updatedSession = AudioHelper.SetTargetVolume(processInfo, volume);
+                _settingsStore.Save(processInfo);
+                return updatedSession;
+            }
+            finally {
+                _monitorLock.Release();
+            }
+        }
+
         private async Task RefreshMonitorWindowProcessListAsync() {
             var removedProcesses = MonitorWindowProcessList.Where(p => !p.Refresh() || !p.EnableUnfocusMute).ToList();
             foreach (var process in removedProcesses) {
@@ -215,20 +270,55 @@ namespace WindowTool.Service {
                 Debug.WriteLine($"[RefreshMonitorWindowProcessList] Removed closed process PID: {process.Id}");
             }
 
-            MonitorWindowProcessList.RemoveAll(removedProcesses.Contains);
+            if (removedProcesses.Count > 0) {
+                HashSet<int> removedIds = removedProcesses.Select(process => process.Id).ToHashSet();
+                MonitorWindowProcessList = MonitorWindowProcessList
+                    .Where(process => !removedIds.Contains(process.Id))
+                    .ToList();
+            }
+        }
+
+        public Task ShutdownAsync() {
+            lock (_shutdownLock) {
+                return _shutdownTask ??= ShutdownCoreAsync();
+            }
+        }
+
+        private async Task ShutdownCoreAsync() {
+            _shuttingDown = true;
+            StopMonitoring();
+            ProcessHelper.FocusWindowChanged -= OnFocusWindowChanged;
+
+            await _monitorLock.WaitAsync().ConfigureAwait(false);
+            try {
+                try {
+                    await CancelAllTasksAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex) {
+                    Debug.WriteLine($"[Shutdown] Error cancelling audio tasks: {ex.Message}");
+                }
+
+                try {
+                    int failedRestoreCount = AudioHelper.RestoreAllManagedSessions();
+                    if (failedRestoreCount > 0) {
+                        Debug.WriteLine($"[ProcessService] {failedRestoreCount} audio session(s) could not be restored.");
+                    }
+                }
+                catch (Exception ex) {
+                    Debug.WriteLine($"[Shutdown] Error restoring audio state: {ex.Message}");
+                }
+            }
+            finally {
+                _monitorLock.Release();
+            }
         }
 
         public void Dispose() {
             if (_disposed) return;
 
-            StopMonitoring();
-
-            try {
-                CancelAllTasksAsync().GetAwaiter().GetResult();
-            }
-            catch (Exception ex) {
-                Debug.WriteLine($"[Dispose] Error cancelling tasks: {ex.Message}");
-            }
+            // App normally awaits ShutdownAsync before OnExit. This remains an
+            // idempotent fallback for non-UI callers and exceptional exits.
+            ShutdownAsync().ConfigureAwait(false).GetAwaiter().GetResult();
 
             _monitorLock.Dispose();
             _disposed = true;
@@ -239,13 +329,13 @@ namespace WindowTool.Service {
 
         private async Task CancelAllTasksAsync() {
             foreach (var process in MonitorWindowProcessList.ToList()) {
-                await CancelTaskAsync(process);
+                await CancelTaskAsync(process).ConfigureAwait(false);
             }
 
-            foreach (var kvp in _muteTasks.ToArray()) {
-                if (!_muteTasks.TryRemove(kvp.Key, out var taskInfo)) continue;
+            foreach (var kvp in _muteTasks.Snapshot()) {
+                if (!_muteTasks.TryTake(kvp.Key, out var taskInfo) || taskInfo == null) continue;
 
-                taskInfo.Cts.Cancel();
+                taskInfo.Cancellation.Cancel();
                 try {
                     await taskInfo.Task.ConfigureAwait(false);
                 }
@@ -255,13 +345,19 @@ namespace WindowTool.Service {
                     Debug.WriteLine($"[CancelAllTasks] Task failed while cancelling PID {kvp.Key}: {ex.Message}");
                 }
                 finally {
-                    taskInfo.Cts.Dispose();
+                    taskInfo.Cancellation.Dispose();
                 }
             }
         }
 
         private void ThrowIfDisposed() {
             ObjectDisposedException.ThrowIf(_disposed, this);
+        }
+
+        private void ThrowIfShuttingDown() {
+            if (_shuttingDown) {
+                throw new ObjectDisposedException(nameof(ProcessService), "WindowTool is shutting down.");
+            }
         }
     }
 }

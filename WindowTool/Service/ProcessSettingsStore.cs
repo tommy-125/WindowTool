@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Text.Json;
 using WindowTool.Model;
 
@@ -6,6 +7,7 @@ namespace WindowTool.Service {
     internal sealed class ProcessSettingsStore {
         private readonly string _settingsPath;
         private readonly Dictionary<string, ProcessSettings> _settingsByProcessName;
+        private readonly object _sync = new();
 
         public ProcessSettingsStore() {
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -15,7 +17,12 @@ namespace WindowTool.Service {
         }
 
         public void Apply(ProcessInfo process) {
-            if (!_settingsByProcessName.TryGetValue(process.Name, out var settings)) return;
+            ProcessSettings? settings;
+            lock (_sync) {
+                _settingsByProcessName.TryGetValue(process.Name, out settings);
+            }
+
+            if (settings == null) return;
 
             process.EnableUnfocusMute = settings.EnableUnfocusMute;
             process.UnfocusMuteDurationSec = settings.UnfocusMuteDurationSec;
@@ -23,23 +30,29 @@ namespace WindowTool.Service {
             process.FadeMuteDurationSec = settings.FadeMuteDurationSec;
             process.FadeUnmuteDurationSec = settings.FadeUnmuteDurationSec;
             process.ShouldBeTopMost = settings.ShouldBeTopMost;
-            process.HasOriginalVolume = settings.HasOriginalVolume;
-            if (settings.HasOriginalVolume) {
-                process.OriginalVolume = settings.OriginalVolume;
+            bool hasTargetVolume = settings.HasTargetVolume || settings.HasOriginalVolume == true;
+            process.HasTargetVolume = hasTargetVolume;
+            if (hasTargetVolume) {
+                float storedVolume = settings.HasTargetVolume
+                    ? settings.TargetVolume
+                    : settings.OriginalVolume ?? 1.0f;
+                process.TargetVolume = Math.Clamp(storedVolume, 0.0f, 1.0f);
             }
         }
 
         public void Save(ProcessInfo process) {
-            _settingsByProcessName[process.Name] = new ProcessSettings {
-                EnableUnfocusMute = process.EnableUnfocusMute,
-                UnfocusMuteDurationSec = process.UnfocusMuteDurationSec,
-                FocusUnmuteDurationSec = process.FocusUnmuteDurationSec,
-                FadeMuteDurationSec = process.FadeMuteDurationSec,
-                FadeUnmuteDurationSec = process.FadeUnmuteDurationSec,
-                ShouldBeTopMost = process.ShouldBeTopMost,
-                HasOriginalVolume = process.HasOriginalVolume,
-                OriginalVolume = process.OriginalVolume,
-            };
+            lock (_sync) {
+                _settingsByProcessName[process.Name] = new ProcessSettings {
+                    EnableUnfocusMute = process.EnableUnfocusMute,
+                    UnfocusMuteDurationSec = process.UnfocusMuteDurationSec,
+                    FocusUnmuteDurationSec = process.FocusUnmuteDurationSec,
+                    FadeMuteDurationSec = process.FadeMuteDurationSec,
+                    FadeUnmuteDurationSec = process.FadeUnmuteDurationSec,
+                    ShouldBeTopMost = process.ShouldBeTopMost,
+                    HasTargetVolume = process.HasTargetVolume,
+                    TargetVolume = process.TargetVolume,
+                };
+            }
 
             PersistSettings();
         }
@@ -65,8 +78,13 @@ namespace WindowTool.Service {
                     Directory.CreateDirectory(directory);
                 }
 
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                File.WriteAllText(_settingsPath, JsonSerializer.Serialize(_settingsByProcessName, options));
+                string json;
+                lock (_sync) {
+                    var options = new JsonSerializerOptions { WriteIndented = true };
+                    json = JsonSerializer.Serialize(_settingsByProcessName, options);
+                }
+
+                File.WriteAllText(_settingsPath, json);
             }
             catch (Exception ex) {
                 Debug.WriteLine($"[ProcessSettingsStore] Failed to save settings: {ex.Message}");
